@@ -1647,12 +1647,20 @@ func (r *Replica) Send(
 	// If the internal Raft group is not initialized, create it and wake the leader.
 	r.maybeInitializeRaftGroup(ctx)
 
+	useRaft := ba.IsWrite()
+	isReadOnly := ba.IsReadOnly()
+
+	if isReadOnly && r.store.Clock().MaxOffset() == 0 {
+		// Clockless reads mode: reads go through Raft.
+		useRaft = true
+	}
+
 	// Differentiate between admin, read-only and write.
 	var pErr *roachpb.Error
-	if ba.IsWrite() {
+	if useRaft {
 		log.Event(ctx, "read-write path")
 		br, pErr = r.executeWriteBatch(ctx, ba)
-	} else if ba.IsReadOnly() {
+	} else if isReadOnly {
 		log.Event(ctx, "read-only path")
 		br, pErr = r.executeReadOnlyBatch(ctx, ba)
 	} else if ba.IsAdmin() {
@@ -1768,6 +1776,11 @@ func (ec *endCmds) done(br *roachpb.BatchResponse, pErr *roachpb.Error, retry pr
 			log.Fatal(context.Background(), err)
 		}
 		creq := makeCacheRequest(&ec.ba, br, span)
+
+		if ec.repl.store.Clock().MaxOffset() == 0 {
+			// Clockless mode: all reads count as writes.
+			creq.writes, creq.reads = append(creq.writes, creq.reads...), nil
+		}
 		ec.repl.store.tsCacheMu.Lock()
 		ec.repl.store.tsCacheMu.cache.AddRequest(creq)
 		ec.repl.store.tsCacheMu.Unlock()
@@ -1906,6 +1919,7 @@ func (r *Replica) beginCmds(
 	var cmds [numSpanAccess]struct {
 		global, local *cmd
 	}
+	clocklessReads := r.store.Clock().MaxOffset() == 0
 	// Don't use the command queue for inconsistent reads.
 	if ba.ReadConsistency != roachpb.INCONSISTENT {
 
@@ -1942,12 +1956,13 @@ func (r *Replica) beginCmds(
 		// Collect all the channels to wait on before adding this batch to the
 		// command queue.
 		for i := SpanAccess(0); i < numSpanAccess; i++ {
-			readOnly := i == SpanReadOnly
+			// With clockless reads, everything is treated as writing.
+			readOnly := i == SpanReadOnly && !clocklessReads
 			chans = append(chans, r.cmdQMu.global.getWait(readOnly, reqGlobalTS, spans.getSpans(i, spanGlobal))...)
 			chans = append(chans, r.cmdQMu.local.getWait(readOnly, reqLocalTS, spans.getSpans(i, spanLocal))...)
 		}
 		for i := SpanAccess(0); i < numSpanAccess; i++ {
-			readOnly := i == SpanReadOnly
+			readOnly := i == SpanReadOnly && !clocklessReads // ditto above
 			cmds[i].global = r.cmdQMu.global.add(readOnly, reqGlobalTS, spans.getSpans(i, spanGlobal))
 			cmds[i].local = r.cmdQMu.local.add(readOnly, reqLocalTS, spans.getSpans(i, spanLocal))
 		}

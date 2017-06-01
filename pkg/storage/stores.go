@@ -162,6 +162,8 @@ func (ls *Stores) Send(
 		return nil, roachpb.NewError(err)
 	}
 
+	// NB: Still need this code when MaxOffset is zero. It'll make sure we don't
+	// retry an unbounded number of times, but only once per node tops.
 	if ba.Txn != nil {
 		// For calls that read data within a txn, we keep track of timestamps
 		// observed from the various participating nodes' HLC clocks. If we have
