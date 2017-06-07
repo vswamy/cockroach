@@ -72,7 +72,7 @@ metadata:
   name: cockroachdb
 spec:
   serviceName: "cockroachdb"
-  replicas: 3
+  replicas: 1
   template:
     metadata:
       labels:
@@ -133,10 +133,73 @@ spec:
                         "mountPath": "/cockroach/cockroach-data"
                     }
                 ]
+            },
+            {
+                "name": "certificate-init-container",
+                "image": "gcr.io/hightowerlabs/certificate-init-container:0.0.1",
+                "imagePullPolicy": "IfNotPresent",
+                "env": [
+                  {
+                    "name": "NAMESPACE",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  },
+                  {
+                    "name": "POD_NAME",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.name"
+                      }
+                    }
+                  },
+                  {
+                    "name": "POD_IP",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "status.podIP"
+                      }
+                    }
+                  }
+                ],
+                "args": [
+                  "-additional-dnsnames=example.com",
+                  "-cert-dir=/etc/tls",
+                  "-namespace=$(NAMESPACE)",
+                  "-pod-ip=$(POD_IP)",
+                  "-pod-name=$(POD_NAME)",
+                  "-service-names=tls-app"
+                ],
+                "volumeMounts": [
+                  {
+                    "name": "tls",
+                    "mountPath": "/etc/tls"
+                  }
+                ]
             }
         ]'
     spec:
       containers:
+      - name: tls-app
+        image: gcr.io/hightowerlabs/tls-app:1.0.0
+        imagePullPolicy: Always
+        args:
+        - "-tls-cert=/etc/tls/node.crt"
+        - "-tls-key=/etc/tls/node.key"
+        ports:
+        - containerPort: 443
+        resources:
+          limits:
+            memory: "50Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: tls
+          mountPath: /etc/tls
       - name: cockroachdb
         image: cockroachdb/cockroach:v1.0.1
         imagePullPolicy: IfNotPresent
@@ -178,6 +241,8 @@ spec:
       - name: datadir
         persistentVolumeClaim:
           claimName: datadir
+      - name: tls
+        emptyDir: {}
   volumeClaimTemplates:
   - metadata:
       name: datadir
