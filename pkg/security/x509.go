@@ -133,7 +133,7 @@ func GenerateServerCert(
 		return nil, err
 	}
 
-	// Only server authentication is allowed.
+	// Only server/client authentication is allowed.
 	template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
 	if hosts != nil {
 		for _, h := range hosts {
@@ -151,6 +151,40 @@ func GenerateServerCert(
 	}
 
 	return certBytes, nil
+}
+
+// GenerateServerCSR generates a certificate signing request for a server certificate and
+// returns the CSR bytes.
+// Takes in the node public key and the list of hosts/ip addresses this certificate applies to.
+func GenerateServerCSR(
+	nodePublicKey crypto.PublicKey,
+	hosts []string,
+) ([]byte, error) {
+
+	csr := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			Organization: []string{"Cockroach"},
+			CommonName:   NodeUser,
+		},
+	}
+
+	// Only server/client authentication is allowed.
+	if hosts != nil {
+		for _, h := range hosts {
+			if ip := net.ParseIP(h); ip != nil {
+				csr.IPAddresses = append(csr.IPAddresses, ip)
+			} else {
+				csr.DNSNames = append(csr.DNSNames, h)
+			}
+		}
+	}
+
+	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, csr, nodePublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return csrBytes, nil
 }
 
 // GenerateClientCert generates a client certificate and returns the cert bytes.

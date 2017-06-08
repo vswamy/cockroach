@@ -90,6 +90,15 @@ Then once you have a Kubernetes cluster running, either run the
 [gce.sh](gce.sh) script or just run `kubectl create -f cockroachdb-statefulset.yaml`
 to create your cockroachdb cluster.
 
+## Testing in the cloud on Azure
+
+Set up your cluster following the
+[instructions provided in the Kubernetes docs](https://kubernetes.io/docs/getting-started-guides/azure/).
+
+Then once you have a Kubernetes cluster running, either run the
+[azure.sh](azure.sh) script or just run `kubectl create -f cockroachdb-statefulset.yaml`
+to create your cockroachdb cluster.
+
 ## Accessing the database
 
 Along with our StatefulSet configuration, we expose a standard Kubernetes service
