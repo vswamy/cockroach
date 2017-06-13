@@ -50,10 +50,10 @@ nemeses=(
 )
 
 tests=(
-    "bank"
-    "comments"
-    "register"
-    "monotonic"
-    "sets"
+    #"bank"
+    #"comments"
+    #"register"
+    #"monotonic"
+    #"sets"
     "sequential"
 )
