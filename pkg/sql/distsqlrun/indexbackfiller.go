@@ -17,13 +17,12 @@
 package distsqlrun
 
 import (
-	"golang.org/x/net/context"
-
 	"github.com/cockroachdb/cockroach/pkg/internal/client"
 	"github.com/cockroachdb/cockroach/pkg/roachpb"
 	"github.com/cockroachdb/cockroach/pkg/sql/parser"
 	"github.com/cockroachdb/cockroach/pkg/sql/sqlbase"
 	"github.com/cockroachdb/cockroach/pkg/util/log"
+	"golang.org/x/net/context"
 )
 
 // indexBackfiller is a processor that backfills new indexes.
@@ -113,6 +112,7 @@ func (ib *indexBackfiller) runChunk(
 		added[i] = *m.GetIndex()
 	}
 	secondaryIndexEntries := make([]sqlbase.IndexEntry, len(mutations))
+	b := &client.Batch{}
 	err := ib.flowCtx.clientDB.Txn(ctx, func(ctx context.Context, txn *client.Txn) error {
 		if ib.flowCtx.testingKnobs.RunBeforeBackfillChunk != nil {
 			if err := ib.flowCtx.testingKnobs.RunBeforeBackfillChunk(sp); err != nil {
@@ -138,7 +138,6 @@ func (ib *indexBackfiller) runChunk(
 			return err
 		}
 
-		b := txn.NewBatch()
 		for i := int64(0); i < chunkSize; i++ {
 			encRow, err := ib.fetcher.NextRow(ctx)
 			if err != nil {
@@ -165,10 +164,13 @@ func (ib *indexBackfiller) runChunk(
 			}
 		}
 		// Write the new index values.
-		if err := txn.CommitInBatch(ctx, b); err != nil {
-			return ConvertBackfillError(&ib.spec.Table, b)
-		}
+		//if err := txn.CommitInBatch(ctx, b); err != nil {
+		//	return ConvertBackfillError(&ib.spec.Table, b)
+		//}
 		return nil
 	})
+	if err := ib.flowCtx.clientDB.Run(ctx, b); err != nil {
+		return nil, ConvertBackfillError(&ib.spec.Table, b)
+	}
 	return ib.fetcher.Key(), err
 }
