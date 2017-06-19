@@ -3864,15 +3864,6 @@ func (r *Replica) sendRaftMessageRequest(ctx context.Context, req *RaftMessageRe
 		log.Infof(ctx, "sending raft request %+v", req)
 	}
 
-	if req.Message.Type == raftpb.MsgApp {
-		for i := range req.Message.Entries {
-			e := &req.Message.Entries[i]
-			if sniffSideloadedRaftCommand(e.Data) {
-				log.Fatal(ctx, "must not put a sideloaded Raft command on the wire")
-			}
-		}
-	}
-
 	return r.store.cfg.Transport.SendAsync(req)
 }
 
