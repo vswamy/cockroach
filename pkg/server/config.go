@@ -70,6 +70,44 @@ var timeUntilStoreDead = settings.RegisterNonNegativeDurationSetting(
 	"the time after which if there is no new gossiped information about a store, it is considered dead",
 	5*time.Minute)
 
+// MaxOffsetType stores the configured MaxOffset.
+type MaxOffsetType time.Duration
+
+// Type implements the pflag.Value interface.
+func (mo *MaxOffsetType) Type() string {
+	return "MaxOffset"
+}
+
+// Set implements the pflag.Value interface.
+func (mo *MaxOffsetType) Set(v string) error {
+	if v == "clockless" {
+		*mo = MaxOffsetType(math.MaxInt64)
+		return nil
+	}
+	nanos, err := time.ParseDuration(v)
+	if err != nil {
+		return err
+	}
+	if nanos == math.MaxInt64 {
+		return errors.Errorf("%s is not a valid MaxOffset", v)
+	}
+	*mo = MaxOffsetType(nanos)
+	return nil
+}
+
+// String implements the pflag.Value interface.
+func (mo *MaxOffsetType) String() string {
+	if *mo == math.MaxInt64 {
+		return "clockless"
+	}
+	return fmt.Sprintf("%d", *mo)
+}
+
+// Clockless is true if the cluster is running in clockless read mode.
+func (mo *MaxOffsetType) Clockless() bool {
+	return int64(*mo) == math.MaxInt64
+}
+
 // Config holds parameters needed to setup a server.
 type Config struct {
 	// Embed the base context.
@@ -130,7 +168,7 @@ type Config struct {
 	// Increasing this value will increase time to recovery after
 	// failures, and increase the frequency and impact of
 	// ReadWithinUncertaintyIntervalError.
-	MaxOffset time.Duration
+	MaxOffset MaxOffsetType
 
 	// RaftTickInterval is the resolution of the Raft timer.
 	RaftTickInterval time.Duration
@@ -323,7 +361,7 @@ func MakeConfig() Config {
 	}
 	cfg := Config{
 		Config:                   new(base.Config),
-		MaxOffset:                base.DefaultMaxClockOffset,
+		MaxOffset:                MaxOffsetType(base.DefaultMaxClockOffset),
 		CacheSize:                defaultCacheSize,
 		SQLMemoryPoolSize:        defaultSQLMemoryPoolSize,
 		ScanInterval:             defaultScanInterval,

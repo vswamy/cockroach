@@ -133,7 +133,7 @@ func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
 
 	s := &Server{
 		mux:      http.NewServeMux(),
-		clock:    hlc.NewClock(hlc.UnixNano, cfg.MaxOffset),
+		clock:    hlc.NewClock(hlc.UnixNano, time.Duration(cfg.MaxOffset)),
 		stopper:  stopper,
 		cfg:      cfg,
 		registry: metric.NewRegistry(),
