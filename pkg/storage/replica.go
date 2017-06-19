@@ -1650,7 +1650,7 @@ func (r *Replica) Send(
 	useRaft := ba.IsWrite()
 	isReadOnly := ba.IsReadOnly()
 
-	if isReadOnly && r.store.Clock().MaxOffset() == 0 {
+	if isReadOnly && r.store.Clock().MaxOffset() == time.Duration(math.MaxInt64) {
 		// Clockless reads mode: reads go through Raft.
 		useRaft = true
 	}
@@ -1777,7 +1777,7 @@ func (ec *endCmds) done(br *roachpb.BatchResponse, pErr *roachpb.Error, retry pr
 		}
 		creq := makeCacheRequest(&ec.ba, br, span)
 
-		if ec.repl.store.Clock().MaxOffset() == 0 {
+		if ec.repl.store.Clock().MaxOffset() == time.Duration(math.MaxInt64) {
 			// Clockless mode: all reads count as writes.
 			creq.writes, creq.reads = append(creq.writes, creq.reads...), nil
 		}
@@ -1919,7 +1919,7 @@ func (r *Replica) beginCmds(
 	var cmds [numSpanAccess]struct {
 		global, local *cmd
 	}
-	clocklessReads := r.store.Clock().MaxOffset() == 0
+	clocklessReads := r.store.Clock().MaxOffset() == time.Duration(math.MaxInt64)
 	// Don't use the command queue for inconsistent reads.
 	if ba.ReadConsistency != roachpb.INCONSISTENT {
 

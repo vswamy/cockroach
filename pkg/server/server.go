@@ -689,7 +689,12 @@ func (s *Server) Start(ctx context.Context) error {
 			}
 		}
 		if anyStoreBootstrapped {
-			sleepDuration := s.clock.MaxOffset() - timeutil.Since(startTime)
+			var sleepDuration time.Duration
+			// Don't have to sleep for monotonicity when using clockless reads
+			// (nor can we, for we would sleep forever).
+			if maxOffset := s.clock.MaxOffset(); maxOffset != time.Duration(math.MaxInt64) {
+				sleepDuration = maxOffset - timeutil.Since(startTime)
+			}
 			if sleepDuration > 0 {
 				log.Infof(ctx, "sleeping for %s to guarantee HLC monotonicity", sleepDuration)
 				time.Sleep(sleepDuration)
