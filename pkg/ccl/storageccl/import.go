@@ -42,7 +42,9 @@ var importRequestLimiter = makeConcurrentRequestLimiter(importRequestLimit)
 
 func init() {
 	storage.SetImportCmd(evalImport)
-	storage.CanSideloadSSTable = AddSSTableEnabled.Get
+	storage.CanSideloadSSTable = func() bool {
+		return true
+	}
 }
 
 var importBatchSize = func() *settings.ByteSizeSetting {
